@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Remove-Item \"C:\\\\Users\\\\pdvz1\\\\Documents\\\\Flutter\\\\adoptapet\\\\lib\\\\data\\\\models\\\\tracker.dart\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\pdvz1\\\\Documents\\\\Flutter\\\\adoptapet\\\\lib\\\\data\\\\models\\\\tracker_location.dart\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\pdvz1\\\\Documents\\\\Flutter\\\\adoptapet\\\\lib\\\\data\\\\services\\\\tracker_service.dart\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\pdvz1\\\\Documents\\\\Flutter\\\\adoptapet\\\\lib\\\\presentation\\\\screens\\\\trackers\\\\trackers_screen.dart\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\pdvz1\\\\Documents\\\\Flutter\\\\adoptapet\\\\lib\\\\presentation\\\\screens\\\\trackers\\\\tracker_map_screen.dart\" -Force)",
+      "PowerShell(flutter analyze *)",
+      "Bash(flutter analyze *)"
+    ]
+  }
+}
