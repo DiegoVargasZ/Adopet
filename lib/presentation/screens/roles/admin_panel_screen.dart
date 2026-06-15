@@ -102,17 +102,25 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
   // ── Approve / Reject requests ──────────────────────────────
 
   Future<void> _approve(String requestId) async {
-    await _roleService.approveRequest(requestId);
-    _loadRequests();
-    _loadUsers();
-    _loadStats();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Refugio aprobado'),
-          backgroundColor: Color(0xFF2D6A4F),
-        ),
-      );
+    try {
+      await _roleService.approveRequest(requestId);
+      _loadRequests();
+      _loadUsers();
+      _loadStats();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Refugio aprobado'),
+            backgroundColor: Color(0xFF2D6A4F),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al aprobar: $e')),
+        );
+      }
     }
   }
 
@@ -120,7 +128,7 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
     final noteCtrl = TextEditingController();
     final confirm  = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Rechazar solicitud'),
         content: TextField(
           controller: noteCtrl,
@@ -130,21 +138,35 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Rechazar'),
           ),
         ],
       ),
     );
+    noteCtrl.dispose();
     if (confirm == true) {
-      await _roleService.rejectRequest(requestId,
-          note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim());
-      _loadRequests();
+      try {
+        await _roleService.rejectRequest(requestId,
+            note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim());
+        _loadRequests();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Solicitud rechazada')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al rechazar: $e')),
+          );
+        }
+      }
     }
   }
 
@@ -152,10 +174,10 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
     final roles = ['adoptante', 'refugio', 'admin'];
     final selected = await showDialog<String>(
       context: context,
-      builder: (_) => SimpleDialog(
+      builder: (ctx) => SimpleDialog(
         title: const Text('Cambiar rol'),
         children: roles.map((r) => SimpleDialogOption(
-          onPressed: () => Navigator.pop(context, r),
+          onPressed: () => Navigator.pop(ctx, r),
           child: Row(
             children: [
               Icon(_roleIcon(r), color: _roleColor(r), size: 20),
@@ -175,12 +197,20 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
       ),
     );
     if (selected != null && selected != currentRole) {
-      await _roleService.changeUserRole(userId, selected);
-      _loadUsers();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Rol cambiado a $selected')),
-        );
+      try {
+        await _roleService.changeUserRole(userId, selected);
+        _loadUsers();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Rol cambiado a $selected')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al cambiar rol: $e')),
+          );
+        }
       }
     }
   }
@@ -191,17 +221,17 @@ class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
     final name    = petMap['name'] as String? ?? 'esta mascota';
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Eliminar mascota'),
         content: Text('¿Eliminar a $name? Esta acción no se puede deshacer.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Eliminar',
                 style: TextStyle(color: Colors.white)),
           ),

@@ -40,7 +40,7 @@ class ShelterService {
         .maybeSingle();
 
     if (data == null) return null;
-    return Shelter.fromJson(data as Map<String, dynamic>);
+    return Shelter.fromJson(data);
   }
 
   /// Actualiza los datos del refugio del usuario actual

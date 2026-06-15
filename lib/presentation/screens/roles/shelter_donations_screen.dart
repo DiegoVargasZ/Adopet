@@ -2,6 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -27,11 +30,255 @@ final _shelterDonationsProvider =
   return List<Map<String, dynamic>>.from(data as List);
 });
 
-class ShelterDonationsScreen extends ConsumerWidget {
+class ShelterDonationsScreen extends ConsumerStatefulWidget {
   const ShelterDonationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ShelterDonationsScreen> createState() =>
+      _ShelterDonationsScreenState();
+}
+
+class _ShelterDonationsScreenState
+    extends ConsumerState<ShelterDonationsScreen> {
+  bool _exporting = false;
+
+  // ── Exportar PDF ──────────────────────────────────────────────────
+
+  Future<void> _exportPdf(List<Map<String, dynamic>> donations) async {
+    setState(() => _exporting = true);
+    try {
+      final dateFmt  = DateFormat('dd/MM/yyyy', 'es');
+      final timeFmt  = DateFormat('dd/MM/yyyy HH:mm', 'es');
+      final today    = dateFmt.format(DateTime.now());
+      final total    = donations.fold(
+          0.0, (s, d) => s + (d['amount'] as num).toDouble());
+
+      final doc = pw.Document(title: 'Donaciones');
+
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(36),
+          header: (ctx) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    'Reporte de Donaciones',
+                    style: pw.TextStyle(
+                        fontSize: 20, fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.Text(
+                    'AdoptaPet',
+                    style: pw.TextStyle(
+                        fontSize: 14,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColor.fromHex('#FF6B35')),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                'Generado el $today',
+                style: pw.TextStyle(
+                    fontSize: 10, color: PdfColors.grey600),
+              ),
+              pw.Divider(color: PdfColors.grey300),
+              pw.SizedBox(height: 4),
+            ],
+          ),
+          footer: (ctx) => pw.Column(
+            children: [
+              pw.Divider(color: PdfColors.grey300),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    'AdoptaPet — Reporte de Donaciones',
+                    style: const pw.TextStyle(
+                        fontSize: 8, color: PdfColors.grey),
+                  ),
+                  pw.Text(
+                    'Página ${ctx.pageNumber} de ${ctx.pagesCount}',
+                    style: const pw.TextStyle(
+                        fontSize: 8, color: PdfColors.grey),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          build: (ctx) => [
+            // ── Tarjeta de resumen ──────────────────────────
+            pw.Container(
+              padding: const pw.EdgeInsets.all(14),
+              decoration: pw.BoxDecoration(
+                color: PdfColor.fromHex('#F0F9F4'),
+                borderRadius: const pw.BorderRadius.all(
+                    pw.Radius.circular(8)),
+                border: pw.Border.all(
+                    color: PdfColor.fromHex('#B7DFC8'), width: 0.5),
+              ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+                children: [
+                  _pdfStat('Total recaudado',
+                      'Bs. ${total.toStringAsFixed(2)}', true),
+                  _pdfDivider(),
+                  _pdfStat('Donaciones', '${donations.length}', false),
+                  _pdfDivider(),
+                  _pdfStat('Promedio',
+                      donations.isEmpty
+                          ? 'Bs. 0.00'
+                          : 'Bs. ${(total / donations.length).toStringAsFixed(2)}',
+                      false),
+                ],
+              ),
+            ),
+
+            pw.SizedBox(height: 20),
+
+            // ── Tabla de donaciones ──────────────────────────
+            pw.Table(
+              border: pw.TableBorder.all(
+                  color: PdfColors.grey300, width: 0.5),
+              columnWidths: {
+                0: const pw.FixedColumnWidth(78),
+                1: const pw.FlexColumnWidth(2),
+                2: const pw.FixedColumnWidth(74),
+                3: const pw.FlexColumnWidth(3),
+              },
+              children: [
+                // Encabezado
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(
+                    color: PdfColor.fromHex('#2D6A4F'),
+                  ),
+                  children: ['Fecha', 'Donante', 'Monto (Bs.)', 'Mensaje']
+                      .map((h) => pw.Padding(
+                            padding: const pw.EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 7),
+                            child: pw.Text(
+                              h,
+                              style: pw.TextStyle(
+                                fontSize: 9,
+                                fontWeight: pw.FontWeight.bold,
+                                color: PdfColors.white,
+                              ),
+                            ),
+                          ))
+                      .toList(),
+                ),
+
+                // Filas de datos
+                ...donations.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final d = entry.value;
+                  final profile =
+                      d['profiles'] as Map<String, dynamic>?;
+                  final dt = DateTime.parse(d['created_at'] as String)
+                      .toLocal();
+                  final isEven = i % 2 == 0;
+
+                  return pw.TableRow(
+                    decoration: pw.BoxDecoration(
+                      color: isEven ? PdfColors.white : PdfColors.grey50,
+                    ),
+                    children: [
+                      timeFmt.format(dt),
+                      profile?['full_name'] as String? ??
+                          'Donante anónimo',
+                      (d['amount'] as num).toStringAsFixed(2),
+                      d['message'] as String? ?? '',
+                    ]
+                        .map((text) => pw.Padding(
+                              padding: const pw.EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 5),
+                              child: pw.Text(
+                                text,
+                                style:
+                                    const pw.TextStyle(fontSize: 9),
+                              ),
+                            ))
+                        .toList(),
+                  );
+                }),
+              ],
+            ),
+
+            pw.SizedBox(height: 12),
+
+            // Total al pie de la tabla
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Container(
+                padding: const pw.EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 6),
+                decoration: pw.BoxDecoration(
+                  color: PdfColor.fromHex('#2D6A4F'),
+                  borderRadius:
+                      const pw.BorderRadius.all(pw.Radius.circular(4)),
+                ),
+                child: pw.Text(
+                  'TOTAL: Bs. ${total.toStringAsFixed(2)}',
+                  style: pw.TextStyle(
+                    fontSize: 11,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (format) async => doc.save(),
+        name:
+            'donaciones_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al exportar: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  pw.Widget _pdfStat(String label, String value, bool highlight) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: [
+        pw.Text(label,
+            style: const pw.TextStyle(
+                fontSize: 9, color: PdfColors.grey700)),
+        pw.SizedBox(height: 2),
+        pw.Text(
+          value,
+          style: pw.TextStyle(
+            fontSize: highlight ? 16 : 14,
+            fontWeight: pw.FontWeight.bold,
+            color: highlight
+                ? PdfColor.fromHex('#2D6A4F')
+                : PdfColors.black,
+          ),
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _pdfDivider() => pw.Container(
+        width: 0.5, height: 36, color: PdfColors.grey300);
+
+  // ── Build ─────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
     final asyncDonations = ref.watch(_shelterDonationsProvider);
     final dateFmt = DateFormat('d MMM yyyy', 'es');
 
@@ -39,6 +286,25 @@ class ShelterDonationsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Donaciones recibidas'),
         actions: [
+          asyncDonations.maybeWhen(
+            data: (donations) => donations.isEmpty
+                ? const SizedBox.shrink()
+                : _exporting
+                    ? const Padding(
+                        padding: EdgeInsets.all(14),
+                        child: SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        ),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.picture_as_pdf_outlined),
+                        tooltip: 'Exportar PDF',
+                        onPressed: () => _exportPdf(donations),
+                      ),
+            orElse: () => const SizedBox.shrink(),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => ref.invalidate(_shelterDonationsProvider),
@@ -96,7 +362,7 @@ class ShelterDonationsScreen extends ConsumerWidget {
                     gradient: LinearGradient(
                       colors: [
                         AppTheme.secondary,
-                        AppTheme.secondary.withOpacity(0.75),
+                        AppTheme.secondary.withValues(alpha: 0.75),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -144,19 +410,46 @@ class ShelterDonationsScreen extends ConsumerWidget {
                   ),
                 ),
 
+                // ── Nota de exportar (solo primera vez) ──
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.secondary.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: AppTheme.secondary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.picture_as_pdf_outlined,
+                          color: AppTheme.secondary, size: 18),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Toca el ícono PDF en la barra superior para exportar el reporte.',
+                          style: TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
                 // ── Lista ────────────────────────────────
                 Expanded(
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: donations.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (_, i) =>
                         const Divider(height: 1),
                     itemBuilder: (_, i) {
-                      final d = donations[i];
+                      final d       = donations[i];
                       final profile =
                           d['profiles'] as Map<String, dynamic>?;
                       final dt = DateTime.parse(
-                          d['created_at'] as String).toLocal();
+                              d['created_at'] as String)
+                          .toLocal();
                       return ListTile(
                         contentPadding:
                             const EdgeInsets.symmetric(vertical: 8),
@@ -164,7 +457,7 @@ class ShelterDonationsScreen extends ConsumerWidget {
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color:
-                                AppTheme.secondary.withOpacity(0.1),
+                                AppTheme.secondary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(Icons.volunteer_activism,

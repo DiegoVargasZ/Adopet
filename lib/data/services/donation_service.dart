@@ -21,7 +21,7 @@ class DonationService {
       'status':     'completed',
     }).select().single();
 
-    return Donation.fromJson(data as Map<String, dynamic>);
+    return Donation.fromJson(data);
   }
 
   // Historial de donaciones del usuario
@@ -45,7 +45,7 @@ class DonationService {
         .eq('shelter_id', shelterId)
         .maybeSingle();
 
-    return data as Map<String, dynamic>? ??
+    return data ??
         {'total_donations': 0, 'total_amount': 0.0};
   }
 }

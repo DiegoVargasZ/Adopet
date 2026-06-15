@@ -94,7 +94,7 @@ class _PetsScreenState extends ConsumerState<PetsScreen> {
       // Drawer de filtros (solo en móvil)
       endDrawer: isWide
           ? null
-          : _FilterDrawer(onApply: () { Navigator.pop(context); _load(); }),
+          : _FilterDrawer(onApply: () { context.pop(); _load(); }),
 
       body: isWide
           ? _desktopBody(context, filter)

@@ -155,16 +155,16 @@ class _MyRequestsTab extends ConsumerWidget {
       BuildContext context, WidgetRef ref, AdoptionRequest r) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Cancelar solicitud'),
         content:
             Text('¿Cancelar la solicitud de adopción de ${r.petName ?? "la mascota"}?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(ctx, false),
               child: const Text('No')),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Sí, cancelar',
                 style: TextStyle(color: Colors.white)),
@@ -249,16 +249,16 @@ class _ShelterRequestsTab extends ConsumerWidget {
       BuildContext context, WidgetRef ref, AdoptionRequest r) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Aprobar adopción'),
         content: Text(
             '¿Aprobar la adopción de ${r.petName ?? "la mascota"}? La mascota quedará marcada como adoptada.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Cancelar')),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2D6A4F)),
             child: const Text('Aprobar',
@@ -290,7 +290,7 @@ class _ShelterRequestsTab extends ConsumerWidget {
     final ctrl = TextEditingController();
     final note = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Rechazar solicitud'),
         content: TextField(
           controller: ctrl,
@@ -301,10 +301,10 @@ class _ShelterRequestsTab extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(ctx),
               child: const Text('Cancelar')),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
             style:
                 ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Rechazar',

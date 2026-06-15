@@ -118,6 +118,46 @@ class ChatService {
     });
   }
 
+  // Marca como leídos todos los mensajes recibidos (no míos) en el chat
+  Future<void> markMessagesAsRead(String chatId) async {
+    try {
+      await _client
+          .from('messages')
+          .update({'is_read': true})
+          .eq('chat_id', chatId)
+          .eq('is_read', false)
+          .neq('sender_id', _userId);
+    } catch (_) {
+      // Fallo silencioso: no impide el funcionamiento del chat
+    }
+  }
+
+  // Suscripción a actualizaciones de is_read en mensajes de un chat
+  // → el emisor se entera cuando el receptor leyó sus mensajes
+  RealtimeChannel subscribeToMessageUpdates(
+    String chatId,
+    void Function(String messageId, bool isRead) onUpdate,
+  ) {
+    return _client
+        .channel('msg_reads:$chatId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'chat_id',
+            value: chatId,
+          ),
+          callback: (payload) {
+            final id     = payload.newRecord['id']      as String?;
+            final isRead = payload.newRecord['is_read'] as bool? ?? false;
+            if (id != null) onUpdate(id, isRead);
+          },
+        )
+        .subscribe();
+  }
+
   // Suscripción en tiempo real a nuevos mensajes de UN chat
   RealtimeChannel subscribeToMessages(
     String chatId,

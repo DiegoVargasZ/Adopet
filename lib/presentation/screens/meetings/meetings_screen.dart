@@ -175,16 +175,16 @@ class _MyMeetingsTab extends ConsumerWidget {
       BuildContext context, WidgetRef ref, Meeting m) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Cancelar cita'),
         content: Text('¿Cancelar la visita a ${m.petName ?? "la mascota"}?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('No'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Sí, cancelar',
                 style: TextStyle(color: Colors.white)),
@@ -294,7 +294,7 @@ class _ShelterMeetingsTab extends ConsumerWidget {
     final ctrl = TextEditingController();
     final note = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Rechazar cita'),
         content: TextField(
           controller: ctrl,
@@ -305,11 +305,11 @@ class _ShelterMeetingsTab extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child:
                 const Text('Rechazar', style: TextStyle(color: Colors.white)),

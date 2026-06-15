@@ -23,4 +23,13 @@ class Message {
         isRead: json['is_read'] as bool? ?? false,
         createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
       );
+
+  Message copyWith({bool? isRead}) => Message(
+        id:        id,
+        chatId:    chatId,
+        senderId:  senderId,
+        content:   content,
+        isRead:    isRead ?? this.isRead,
+        createdAt: createdAt,
+      );
 }

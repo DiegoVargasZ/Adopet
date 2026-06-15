@@ -164,6 +164,13 @@ class PetDetailScreen extends StatelessWidget {
           title: Text(pet.name),
           backgroundColor: const Color(0xFFFF6B35),
           foregroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.qr_code_rounded),
+              tooltip: 'Ver código QR',
+              onPressed: () => context.push('/pets/qr', extra: pet),
+            ),
+          ],
         ),
         body: Center(
           child: ConstrainedBox(
@@ -205,6 +212,13 @@ class PetDetailScreen extends StatelessWidget {
             pinned: true,
             backgroundColor: const Color(0xFFFF6B35),
             foregroundColor: Colors.white,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.qr_code_rounded),
+                tooltip: 'Ver código QR',
+                onPressed: () => context.push('/pets/qr', extra: pet),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(background: _gallery()),
           ),
           SliverToBoxAdapter(child: _info(context)),
@@ -405,7 +419,7 @@ class _AdoptionSheetState extends State<_AdoptionSheet> {
           decoration: BoxDecoration(
             color: const Color(0xFFFFF3EE),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFFF6B35).withOpacity(0.3)),
+            border: Border.all(color: const Color(0xFFFF6B35).withValues(alpha: 0.3)),
           ),
           child: const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -490,7 +504,7 @@ class _AdoptionSheetState extends State<_AdoptionSheet> {
         const SizedBox(height: 32),
         ElevatedButton(
           onPressed: () {
-            Navigator.pop(context);
+            context.pop();
             context.push('/adoptions');
           },
           style: ElevatedButton.styleFrom(
@@ -504,7 +518,7 @@ class _AdoptionSheetState extends State<_AdoptionSheet> {
         ),
         const SizedBox(height: 12),
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
           child: const Text('Volver a la mascota',
               style: TextStyle(color: Colors.grey)),
         ),
@@ -823,7 +837,7 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
         const SizedBox(height: 32),
         ElevatedButton(
           onPressed: () {
-            Navigator.pop(context);
+            context.pop();
             context.push('/meetings');
           },
           style: ElevatedButton.styleFrom(
@@ -837,7 +851,7 @@ class _ScheduleSheetState extends State<_ScheduleSheet> {
         ),
         const SizedBox(height: 12),
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
           child: const Text('Volver a la mascota',
               style: TextStyle(color: Color(0xFFFF6B35))),
         ),
@@ -884,10 +898,10 @@ class _PetGalleryState extends State<_PetGallery> {
           controller: _ctrl,
           itemCount:  imgs.length,
           onPageChanged: (i) => setState(() => _page = i),
-          itemBuilder: (_, i) => Image.network(
+          itemBuilder: (context, i) => Image.network(
             imgs[i],
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
+            errorBuilder: (ctx, err, stack) => Container(
               color: const Color(0xFFF5F5F5),
               child: const Center(
                   child: Icon(Icons.pets, size: 80, color: Colors.grey)),

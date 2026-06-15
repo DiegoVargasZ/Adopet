@@ -16,7 +16,7 @@ class RoleService {
         .maybeSingle();
 
     if (data == null) return null;
-    return UserProfile.fromJson(data as Map<String, dynamic>);
+    return UserProfile.fromJson(data);
   }
 
   // Actualizar nombre y/o avatar del perfil
@@ -34,7 +34,7 @@ class RoleService {
         .select()
         .single();
 
-    return UserProfile.fromJson(data as Map<String, dynamic>);
+    return UserProfile.fromJson(data);
   }
 
   // Subir avatar a Supabase Storage y devolver la URL pública
@@ -69,7 +69,7 @@ class RoleService {
         .select()
         .eq('user_id', _userId)
         .maybeSingle();
-    return data as Map<String, dynamic>?;
+    return data;
   }
 
   // ── Admin ──────────────────────────────────────────────────

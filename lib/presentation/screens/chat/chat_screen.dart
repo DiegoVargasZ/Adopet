@@ -21,11 +21,12 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final _chatService = ChatService();
-  final _controller  = TextEditingController();
-  final _scrollCtrl  = ScrollController();
-  final _messages    = <Message>[];
-  late final RealtimeChannel _channel;
+  final _chatService   = ChatService();
+  final _controller    = TextEditingController();
+  final _scrollCtrl    = ScrollController();
+  final _messages      = <Message>[];
+  late final RealtimeChannel _insertChannel;
+  late final RealtimeChannel _updateChannel;
   bool _loading = true;
   bool _sending = false;
 
@@ -35,47 +36,79 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _loadMessages();
-    _channel = _chatService.subscribeToMessages(widget.chatId, (msg) {
-      // Si ya existe como temporal, reemplazar; si es nuevo, agregar
-      final tempIdx = _messages.indexWhere(
-        (m) =>
-            m.id.startsWith('temp_') &&
-            m.content == msg.content &&
-            m.senderId == msg.senderId,
-      );
-      if (tempIdx >= 0) {
-        setState(() => _messages[tempIdx] = msg);
-      } else {
-        if (_messages.any((m) => m.id == msg.id)) return;
-        setState(() => _messages.add(msg));
-      }
-      _scrollToBottom();
-    });
+
+    // Escucha mensajes nuevos (INSERT)
+    _insertChannel = _chatService.subscribeToMessages(
+      widget.chatId,
+      _onNewMessage,
+    );
+
+    // Escucha cambios de is_read (UPDATE) → ticks de lectura en tiempo real
+    _updateChannel = _chatService.subscribeToMessageUpdates(
+      widget.chatId,
+      _onMessageRead,
+    );
   }
 
   @override
   void dispose() {
-    _channel.unsubscribe();
+    _insertChannel.unsubscribe();
+    _updateChannel.unsubscribe();
     _controller.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
 
+  // ── Carga inicial ─────────────────────────────────────────────
+
   Future<void> _loadMessages() async {
     try {
       final msgs = await _chatService.getMessages(widget.chatId);
-      if (mounted) {
-        setState(() {
-          _messages.addAll(msgs);
-          _loading = false;
-        });
-        WidgetsBinding.instance
-            .addPostFrameCallback((_) => _scrollToBottom());
-      }
+      if (!mounted) return;
+      setState(() {
+        _messages.addAll(msgs);
+        _loading = false;
+      });
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _scrollToBottom(animated: false));
+      // Marcar como leídos los mensajes que me enviaron
+      await _chatService.markMessagesAsRead(widget.chatId);
     } catch (e) {
       if (mounted) setState(() => _loading = false);
     }
   }
+
+  // ── Realtime handlers ─────────────────────────────────────────
+
+  void _onNewMessage(Message msg) {
+    final tempIdx = _messages.indexWhere(
+      (m) =>
+          m.id.startsWith('temp_') &&
+          m.content == msg.content &&
+          m.senderId == msg.senderId,
+    );
+    if (tempIdx >= 0) {
+      setState(() => _messages[tempIdx] = msg);
+    } else {
+      if (_messages.any((m) => m.id == msg.id)) return;
+      setState(() => _messages.add(msg));
+      // Si el mensaje es de la otra persona, marcarlo como leído inmediatamente
+      if (msg.senderId != _myId) {
+        _chatService.markMessagesAsRead(widget.chatId);
+      }
+    }
+    _scrollToBottom();
+  }
+
+  void _onMessageRead(String messageId, bool isRead) {
+    final idx = _messages.indexWhere((m) => m.id == messageId);
+    if (idx < 0 || !mounted) return;
+    setState(() {
+      _messages[idx] = _messages[idx].copyWith(isRead: isRead);
+    });
+  }
+
+  // ── Scroll ────────────────────────────────────────────────────
 
   void _scrollToBottom({bool animated = true}) {
     if (!_scrollCtrl.hasClients) return;
@@ -91,6 +124,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // ── Enviar ────────────────────────────────────────────────────
+
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _sending) return;
@@ -98,7 +133,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.clear();
     setState(() => _sending = true);
 
-    // Optimistic UI: mensaje temporal inmediato
     final temp = Message(
       id:        'temp_${DateTime.now().millisecondsSinceEpoch}',
       chatId:    widget.chatId,
@@ -113,7 +147,6 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       await _chatService.sendMessage(widget.chatId, text);
     } catch (e) {
-      // Quitar el temporal si falló
       setState(() => _messages.removeWhere((m) => m.id == temp.id));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -148,8 +181,6 @@ class _ChatScreenState extends State<ChatScreen> {
     return DateFormat('d MMM yyyy', 'es').format(dt);
   }
 
-  // ── Agrupamiento de burbujas ─────────────────────────────────
-  // Misma persona + menos de 2 min de diferencia → misma "burbuja"
   bool _isSameGroup(int index) {
     if (index == 0) return false;
     final prev = _messages[index - 1];
@@ -171,7 +202,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
+      backgroundColor: const Color(0xFFF0EDE8),
       appBar: _buildAppBar(),
       body: SafeArea(
         child: Column(
@@ -188,13 +219,13 @@ class _ChatScreenState extends State<ChatScreen> {
     return AppBar(
       backgroundColor: Colors.white,
       foregroundColor: AppTheme.textMain,
-      elevation: 0,
+      elevation: 0.5,
       titleSpacing: 0,
       title: Row(
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor: AppTheme.primary.withOpacity(0.15),
+            backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
             child: const Icon(Icons.pets, color: AppTheme.primary, size: 20),
           ),
           const SizedBox(width: 10),
@@ -237,7 +268,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.08),
+                color: AppTheme.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.chat_bubble_outline,
@@ -248,19 +279,21 @@ class _ChatScreenState extends State<ChatScreen> {
                 style: TextStyle(
                     fontWeight: FontWeight.w600, color: AppTheme.textMain)),
             const SizedBox(height: 4),
-            const Text('Pregunta sobre la mascota o el proceso de adopción',
-                style: TextStyle(color: AppTheme.textSub, fontSize: 13),
-                textAlign: TextAlign.center),
+            const Text(
+              'Pregunta sobre la mascota o el proceso de adopción',
+              style: TextStyle(color: AppTheme.textSub, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       );
     }
 
-    // Construir lista con separadores de fecha intercalados
     final items = <_ChatItem>[];
     for (var i = 0; i < _messages.length; i++) {
       if (_needsSeparator(i)) {
-        items.add(_ChatItem.separator(_separatorLabel(_messages[i].createdAt)));
+        items.add(_ChatItem.separator(
+            _separatorLabel(_messages[i].createdAt)));
       }
       items.add(_ChatItem.message(
         msg:         _messages[i],
@@ -308,7 +341,7 @@ class _ChatScreenState extends State<ChatScreen> {
               constraints: const BoxConstraints(maxHeight: 120),
               child: TextField(
                 controller: _controller,
-                maxLines: null, // multilinea
+                maxLines: null,
                 textCapitalization: TextCapitalization.sentences,
                 textInputAction: TextInputAction.newline,
                 style: const TextStyle(fontSize: 15),
@@ -357,7 +390,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-// ── Modelo interno de lista ──────────────────────────────────────
+// ── Modelo interno de lista ───────────────────────────────────────
+
 class _ChatItem {
   final bool isSeparator;
   final String? label;
@@ -389,7 +423,8 @@ class _ChatItem {
       );
 }
 
-// ── Separador de fecha ───────────────────────────────────────────
+// ── Separador de fecha ────────────────────────────────────────────
+
 class _DateSeparator extends StatelessWidget {
   final String label;
   const _DateSeparator({required this.label});
@@ -410,7 +445,7 @@ class _DateSeparator extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
+                  color: Colors.black.withValues(alpha: 0.06),
                   blurRadius: 4,
                   offset: const Offset(0, 1),
                 ),
@@ -432,7 +467,8 @@ class _DateSeparator extends StatelessWidget {
   }
 }
 
-// ── Burbuja de mensaje ───────────────────────────────────────────
+// ── Burbuja de mensaje ────────────────────────────────────────────
+
 class _Bubble extends StatelessWidget {
   final Message msg;
   final String  myId;
@@ -448,15 +484,13 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMe    = msg.senderId == myId;
-    final isTemp  = msg.id.startsWith('temp_');
-    final maxW    = MediaQuery.sizeOf(context).width * 0.72;
+    final isMe   = msg.senderId == myId;
+    final isTemp = msg.id.startsWith('temp_');
+    final maxW   = MediaQuery.sizeOf(context).width * 0.72;
 
-    // Espaciado: mensajes del mismo grupo van más juntos
     final topMargin    = sameGroup ? 2.0 : 10.0;
     final bottomMargin = lastInGroup ? 2.0 : 0.0;
 
-    // Radio de las esquinas — sin cola en intermedios, con cola al final
     final radius = BorderRadius.only(
       topLeft:     const Radius.circular(18),
       topRight:    const Radius.circular(18),
@@ -481,7 +515,7 @@ class _Bubble extends StatelessWidget {
             borderRadius: radius,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.08),
                 blurRadius: 4,
                 offset: const Offset(0, 1),
               ),
@@ -501,6 +535,7 @@ class _Bubble extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 3),
+              // Hora + ticks de lectura (solo en mis mensajes)
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -513,11 +548,7 @@ class _Bubble extends StatelessWidget {
                   ),
                   if (isMe) ...[
                     const SizedBox(width: 4),
-                    Icon(
-                      isTemp ? Icons.access_time : Icons.done,
-                      size:  12,
-                      color: Colors.white60,
-                    ),
+                    _ReadTick(isTemp: isTemp, isRead: msg.isRead),
                   ],
                 ],
               ),
@@ -532,5 +563,42 @@ class _Bubble extends StatelessWidget {
     final h = dt.hour.toString().padLeft(2, '0');
     final m = dt.minute.toString().padLeft(2, '0');
     return '$h:$m';
+  }
+}
+
+// ── Indicador de lectura estilo WhatsApp ──────────────────────────
+//
+//  🕐  enviando     → reloj gris
+//  ✓   enviado       → un tick blanco semitransparente
+//  ✓✓  leído         → doble tick azul claro
+//
+class _ReadTick extends StatelessWidget {
+  final bool isTemp;
+  final bool isRead;
+  const _ReadTick({required this.isTemp, required this.isRead});
+
+  @override
+  Widget build(BuildContext context) {
+    if (isTemp) {
+      return const Icon(
+        Icons.access_time_rounded,
+        size: 12,
+        color: Colors.white54,
+      );
+    }
+    if (isRead) {
+      // Doble tick azul → leído
+      return const Icon(
+        Icons.done_all_rounded,
+        size: 14,
+        color: Color(0xFFB3E5FC), // azul claro visible sobre fondo naranja
+      );
+    }
+    // Un tick blanco → enviado, sin leer aún
+    return const Icon(
+      Icons.done_rounded,
+      size: 14,
+      color: Colors.white60,
+    );
   }
 }

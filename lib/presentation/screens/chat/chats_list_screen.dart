@@ -165,7 +165,7 @@ class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.08),
+                color: AppTheme.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.chat_bubble_outline,
@@ -201,14 +201,14 @@ class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
       child: ListView.separated(
         padding: const EdgeInsets.only(top: 8, bottom: 20),
         itemCount: _chats.length,
-        separatorBuilder: (_, __) =>
+        separatorBuilder: (context, index) =>
             const Divider(height: 1, indent: 80, endIndent: 16),
         itemBuilder: (_, i) => _ChatTile(
           chat:      _chats[i],
           myId:      myId,
           isShelter: _isShelter,
           timestamp: _smartTimestamp(_chats[i]),
-          onTap: () {
+          onTap: () async {
             final chat = _chats[i];
             final String label;
             if (_isShelter) {
@@ -218,10 +218,13 @@ class _ChatsListScreenState extends ConsumerState<ChatsListScreen> {
               final s = chat['shelters'] as Map<String, dynamic>? ?? {};
               label = s['name'] as String? ?? 'Refugio';
             }
-            context.push('/chats/chat', extra: {
+            // Esperar a que el usuario vuelva del chat y refrescar
+            // para que los badges de no leídos se actualicen
+            await context.push('/chats/chat', extra: {
               'chatId':      chat['id'] as String,
               'shelterName': label,
             });
+            if (mounted) _load();
           },
         ),
       ),
@@ -255,10 +258,16 @@ class _ChatTile extends StatelessWidget {
         : '';
 
     // Mensajes no leídos que no son míos
-    final unread = msgs.where((m) =>
-        m['is_read'] == false && m['sender_id'] != myId).length;
+    final unread = msgs
+        .where((m) => m['is_read'] == false && m['sender_id'] != myId)
+        .length;
 
     final hasUnread = unread > 0;
+
+    // Último mensaje: es mío?
+    final lastMsg     = msgs.isNotEmpty ? msgs.last : null;
+    final lastIsMine  = lastMsg?['sender_id'] == myId;
+    final lastIsRead  = lastMsg?['is_read'] == true;
 
     // Nombre e imagen según el rol
     final String displayName;
@@ -271,49 +280,30 @@ class _ChatTile extends StatelessWidget {
     } else {
       final s = chat['shelters'] as Map<String, dynamic>? ?? {};
       displayName = s['name'] as String? ?? 'Refugio';
-      avatarUrl   = null; // shelters no tienen avatar aún
+      avatarUrl   = null;
     }
 
     return Material(
-      color: Colors.white,
+      color: hasUnread ? const Color(0xFFFFF8F5) : Colors.white,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
               // Avatar
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor:
-                        AppTheme.primary.withOpacity(0.12),
-                    backgroundImage:
-                        avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                    child: avatarUrl == null
-                        ? Icon(
-                            isShelter ? Icons.person : Icons.pets,
-                            color: AppTheme.primary,
-                            size: 26,
-                          )
-                        : null,
-                  ),
-                  if (hasUnread)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: const BoxDecoration(
-                          color: AppTheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                ],
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
+                backgroundImage:
+                    avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                child: avatarUrl == null
+                    ? Icon(
+                        isShelter ? Icons.person : Icons.pets,
+                        color: AppTheme.primary,
+                        size: 26,
+                      )
+                    : null,
               ),
 
               const SizedBox(width: 14),
@@ -326,30 +316,48 @@ class _ChatTile extends StatelessWidget {
                     Text(
                       displayName,
                       style: TextStyle(
-                        fontWeight: hasUnread
-                            ? FontWeight.w700
-                            : FontWeight.w600,
+                        fontWeight:
+                            hasUnread ? FontWeight.w700 : FontWeight.w600,
                         fontSize: 15,
                         color: AppTheme.textMain,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 3),
-                    Text(
-                      lastContent.isEmpty
-                          ? 'Sin mensajes aún'
-                          : lastContent,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: hasUnread
-                            ? AppTheme.textMain
-                            : AppTheme.textSub,
-                        fontSize: 13,
-                        fontWeight: hasUnread
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                      ),
+                    Row(
+                      children: [
+                        // Ticks del último mensaje si es mío
+                        if (lastIsMine && lastMsg != null) ...[
+                          Icon(
+                            lastIsRead
+                                ? Icons.done_all_rounded
+                                : Icons.done_rounded,
+                            size: 14,
+                            color: lastIsRead
+                                ? AppTheme.primary
+                                : Colors.grey.shade400,
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        Expanded(
+                          child: Text(
+                            lastContent.isEmpty
+                                ? 'Sin mensajes aún'
+                                : lastContent,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: hasUnread
+                                  ? AppTheme.textMain
+                                  : AppTheme.textSub,
+                              fontSize: 13,
+                              fontWeight: hasUnread
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -360,22 +368,21 @@ class _ChatTile extends StatelessWidget {
               // Columna derecha: timestamp + badge
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     timestamp,
                     style: TextStyle(
                       fontSize: 11,
-                      color: hasUnread
-                          ? AppTheme.primary
-                          : AppTheme.textSub,
-                      fontWeight: hasUnread
-                          ? FontWeight.w700
-                          : FontWeight.normal,
+                      color: hasUnread ? AppTheme.primary : AppTheme.textSub,
+                      fontWeight:
+                          hasUnread ? FontWeight.w700 : FontWeight.normal,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 5),
                   if (hasUnread)
                     Container(
+                      constraints: const BoxConstraints(minWidth: 20),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
@@ -383,7 +390,8 @@ class _ChatTile extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        '$unread',
+                        unread > 99 ? '99+' : '$unread',
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,

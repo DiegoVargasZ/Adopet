@@ -11,6 +11,7 @@ import '../../presentation/screens/home/home_screen.dart';
 import '../../presentation/screens/map/map_screen.dart';
 import '../../presentation/screens/pets/pets_screen.dart';
 import '../../presentation/screens/pets/pet_detail_screen.dart';
+import '../../presentation/screens/pets/pet_qr_screen.dart';
 import '../../presentation/screens/shelters/shelters_screen.dart';
 import '../../presentation/screens/shelters/shelter_detail_screen.dart';
 import '../../presentation/screens/chat/chats_list_screen.dart';
@@ -26,6 +27,7 @@ import '../../presentation/screens/meetings/meetings_screen.dart';
 import '../../presentation/screens/profile/profile_screen.dart';
 import '../../presentation/screens/adoptions/adoptions_screen.dart';
 import '../../presentation/widgets/app_shell.dart';
+import '../../presentation/screens/public/public_pet_screen.dart';
 import '../../data/models/pet.dart';
 import '../../data/models/shelter.dart';
 
@@ -47,8 +49,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       const publicRoutes = ['/login', '/register'];
-      if (!isAuth && !publicRoutes.contains(location)) return '/login';
-      if (isAuth  &&  publicRoutes.contains(location)) return '/home';
+      // /p/:petId es la página pública del QR — no requiere login
+      if (!isAuth && !publicRoutes.contains(location) &&
+          !location.startsWith('/p/')) return '/login';
+      if (isAuth && publicRoutes.contains(location)) return '/home';
 
       return null;
     },
@@ -57,6 +61,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/',         builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login',    builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
+
+      // Página pública del QR — sin login, para quien escanea
+      GoRoute(
+        path: '/p/:petId',
+        builder: (_, state) =>
+            PublicPetScreen(petId: state.pathParameters['petId']!),
+      ),
 
       // ── Rutas autenticadas — envueltas en el shell responsivo ──
       ShellRoute(
@@ -81,6 +92,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: 'detail',
                 builder: (_, state) =>
                     PetDetailScreen(pet: state.extra as Pet),
+              ),
+              GoRoute(
+                path: 'qr',
+                builder: (_, state) =>
+                    PetQrScreen(pet: state.extra as Pet),
               ),
             ],
           ),
