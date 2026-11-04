@@ -200,8 +200,23 @@ if ($SkipBuild) {
 }
 
 Write-Host '==> Lanzando el primer build...' -ForegroundColor Cyan
+
+# Los parametros los declara el Jenkinsfile, asi que Jenkins solo los conoce
+# despues del primer build. Mientras el job no tenga parametros hay que usar
+# /build; en cuanto los tiene, /build responde "400 Nothing is submitted" y el
+# endpoint correcto es /buildWithParameters.
+$jobInfo   = (Invoke-Jenkins -Path ('/job/{0}/api/json' -f $JobName)).Content | ConvertFrom-Json
+$hasParams = @($jobInfo.property | Where-Object { $_._class -like '*ParametersDefinitionProperty*' }).Count -gt 0
+
+if ($hasParams) {
+    $buildPath = '/job/{0}/buildWithParameters' -f $JobName
+    Write-Host '    (el job ya tiene parametros; se usan sus valores por defecto)'
+} else {
+    $buildPath = '/job/{0}/build' -f $JobName
+}
+
 $crumb    = Get-Crumb
-$queue    = Invoke-Jenkins -Path ('/job/{0}/build' -f $JobName) -Method POST -ExtraHeaders $crumb
+$queue    = Invoke-Jenkins -Path $buildPath -Method POST -ExtraHeaders $crumb
 $queueUrl = $queue.Headers['Location']
 if (-not $queueUrl) { throw 'Jenkins no devolvio la URL de la cola.' }
 
