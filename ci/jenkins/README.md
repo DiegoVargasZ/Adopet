@@ -130,6 +130,24 @@ Los parámetros los declara el `Jenkinsfile`, así que aparecen en la interfaz
 - **`Compress-Archive` en vez del step `zip`.** Así el pipeline no depende del
   plugin `pipeline-utility-steps`.
 
+## Fallos que encontró el primer CI
+
+Los tres primeros builds fallaron, y en los tres casos la causa fue la misma:
+**el repositorio commiteado estaba por detrás del working tree**. Jenkins hace
+checkout del commit, así que sacó a la luz código que ya estaba corregido en
+local pero sin subir.
+
+| Build | Fallo | Causa | Arreglo |
+| --- | --- | --- | --- |
+| #1 | `fatal: detected dubious ownership in repository at 'C:/src/flutter'` → `Unable to determine engine version` | El servicio corre como `NT AUTHORITY\SYSTEM` y el SDK pertenece a `Pablo`, así que git aborta y Flutter no puede leer su versión. | `GIT_CONFIG_COUNT/KEY_0/VALUE_0` en el `Jenkinsfile`. |
+| #2 | `flutter analyze` con código 1 (118 issues) | `pubspec.yaml` declaraba `assets/images/` y `assets/icons/`, inexistentes en el repo. Son 2 **warnings**, y los warnings sí tumban el build. | Quitar la declaración obsoleta. |
+| #3 | `StateError` al construir `AdoptaPetApp` | `test/widget_test.dart` era la plantilla por defecto de Flutter: buscaba un contador con botón `+` que esta app no tiene. Nunca pudo pasar. | Reemplazado por `test/core_test.dart`. |
+
+Sobre `safe.directory`: git solo lo respeta en *protected configuration*
+(system, global o línea de comandos). Las variables `GIT_CONFIG_*` se registran
+con scope `command`, así que cuentan — y evitan tener que editar la config
+global de `SYSTEM`, que requeriría permisos de administrador.
+
 ## Verificado en esta máquina
 
 - Jenkins 2.580.2, servicio corriendo como `LocalSystem`, `JENKINS_HOME` en
@@ -139,6 +157,12 @@ Los parámetros los declara el `Jenkinsfile`, así que aparecen en la interfaz
 - `flutter test` → 3 pruebas en verde; conversión a JUnit XML con `junitreport`
   funcionando.
 - `flutter build apk --debug` → `app-debug.apk` generado correctamente.
+- **Job `Adopet-CI`, build #4: SUCCESS en 7,2 min** (8 etapas, 76 plugins
+  activos, 0 con dependencias insatisfechas). Artefactos archivados:
+  `app-debug.apk`, `adopet-web.zip`, `junit.xml`, `test-report.json`,
+  `lcov.info`. Reporte JUnit con las 3 pruebas en `PASSED`.
+  Los builds siguientes son más rápidos: las cachés de pub y Gradle ya están
+  calientes en `C:\ProgramData\Jenkins\caches\`.
 
 ## Problemas frecuentes
 
