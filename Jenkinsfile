@@ -36,6 +36,15 @@ pipeline {
         PUB_CACHE        = 'C:\\ProgramData\\Jenkins\\caches\\pub-cache'
         GRADLE_USER_HOME = 'C:\\ProgramData\\Jenkins\\caches\\gradle'
         PATH             = "${FLUTTER_HOME}\\bin;${PUB_CACHE}\\bin;${JAVA_HOME}\\bin;C:\\Program Files\\Git\\cmd;${PATH}"
+        // Jenkins corre como NT AUTHORITY\SYSTEM y el SDK de Flutter pertenece
+        // a otro usuario, asi que git rechaza el repositorio por "dubious
+        // ownership" y Flutter no puede leer su propia version. GIT_CONFIG_*
+        // registra la excepcion con scope "command", que es configuracion
+        // protegida (la unica donde git respeta safe.directory) y no necesita
+        // permisos de administrador ni tocar la config global de SYSTEM.
+        GIT_CONFIG_COUNT   = '1'
+        GIT_CONFIG_KEY_0   = 'safe.directory'
+        GIT_CONFIG_VALUE_0 = 'C:/src/flutter'
         // Evita que Flutter mande analitica desde el servidor de CI
         FLUTTER_SUPPRESS_ANALYTICS = 'true'
         CI               = 'true'
