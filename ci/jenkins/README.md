@@ -10,6 +10,37 @@ el Jenkins que corre en esta máquina (`http://localhost:8080`).
 | `../../Jenkinsfile` | Pipeline declarativo: dependencias, análisis, formato, pruebas, APK y web. |
 | `job-config.xml` | Definición del job de Jenkins (plantilla; el script sustituye repo y rama). |
 | `setup-jenkins.ps1` | Instala plugins, crea/actualiza el job y lanza el primer build. |
+| `install-plugins-offline.py` | Instala plugins escribiendo en `JENKINS_HOME`, sin pasar por la UI. Para reparar una instalación de plugins a medias. |
+
+## Reparación de la instalación de plugins (ya aplicada)
+
+El asistente inicial de Jenkins no terminó de bajar sus plugins: dejó 24
+archivos `*.jpi.tmp` de **0 bytes** en `C:\ProgramData\Jenkins\.jenkins\plugins\`.
+El efecto visible era este error en *Manage Jenkins*:
+
+```
+Pipeline: Declarative Extension Points API — Falta el plugin: pipeline-stage-step
+Pipeline: Declarative              — Falta el plugin: pipeline-stage-step
+```
+
+Sin `pipeline-stage-step` el plugin **Pipeline: Declarative** no carga, y sin él
+un `Jenkinsfile` declarativo no compila: el pipeline no habría arrancado nunca.
+
+`install-plugins-offline.py` ya instaló los 8 plugins que faltaban, verificando
+el sha256 de cada descarga (`git`, `git-client`, `gson-api`,
+`mina-sshd-api-common`, `mina-sshd-api-core`, `pipeline-graph-view`,
+`pipeline-stage-step`, `workflow-aggregator`).
+
+Los archivos `.jpi.tmp` vacíos y restantes pertenecen a `SYSTEM`, así que hay que
+borrarlos desde una consola **como administrador** (son basura, no se cargan,
+pero ensucian la vista de plugins):
+
+```powershell
+Remove-Item 'C:\ProgramData\Jenkins\.jenkins\plugins\*.jpi.tmp' -Force
+Restart-Service jenkins
+```
+
+El reinicio es obligatorio: Jenkins solo activa los `.jpi` nuevos al arrancar.
 
 ## Puesta en marcha
 
@@ -50,7 +81,10 @@ Para usar el repositorio local en vez de GitHub:
 | APK Android | `flutter build apk --debug\|--release` | sí |
 | Web | `flutter build web --release` + zip | sí |
 
-`Análisis estático` y `Formato` corren en paralelo, igual que `APK Android` y `Web`.
+Las etapas corren **en serie** a propósito. En un pipeline declarativo, las
+ramas de un bloque `parallel` que no declaran su propio `agent` comparten el
+mismo workspace, y dos comandos de Flutter simultáneos se pisan en `build/` y
+`.dart_tool/`. Paralelizar aquí requeriría agentes separados.
 
 ### Parámetros del job
 

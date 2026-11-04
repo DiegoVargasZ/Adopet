@@ -32,9 +32,10 @@ $scriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # Plugins que el Jenkinsfile y el job necesitan.
 $requiredPlugins = @(
-    'git',                  # checkout del repositorio (Pipeline script from SCM)
+    'pipeline-stage-step',  # dependencia de Pipeline: Declarative (sin el, el Jenkinsfile no compila)
     'workflow-aggregator',  # suite completa de Pipeline
-    'pipeline-stage-view',  # vista grafica de etapas
+    'git',                  # checkout del repositorio (Pipeline script from SCM)
+    'pipeline-graph-view',  # vista grafica de etapas
     'junit',                # reporte de pruebas
     'timestamper',          # marcas de tiempo en consola
     'ws-cleanup'            # limpieza de workspace

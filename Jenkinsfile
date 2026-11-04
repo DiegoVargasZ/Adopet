@@ -71,30 +71,29 @@ pipeline {
             }
         }
 
-        stage('Verificacion') {
-            parallel {
-                stage('Analisis estatico') {
-                    steps {
-                        // El proyecto tiene ~116 avisos "info" y 0 errores/warnings.
-                        // --no-fatal-infos deja pasar los info pero sigue fallando
-                        // ante errores y warnings reales.
-                        bat 'flutter analyze --no-fatal-infos'
-                    }
-                }
+        // Las etapas van en serie a proposito: sin un "agent" propio, las
+        // ramas de un bloque "parallel" comparten el mismo workspace, y dos
+        // comandos de Flutter a la vez se pisan en build/ y .dart_tool/.
+        stage('Analisis estatico') {
+            steps {
+                // El proyecto tiene ~116 avisos "info" y 0 errores/warnings.
+                // --no-fatal-infos deja pasar los info pero sigue fallando
+                // ante errores y warnings reales.
+                bat 'flutter analyze --no-fatal-infos'
+            }
+        }
 
-                stage('Formato (aviso)') {
-                    steps {
-                        script {
-                            def status = bat(
-                                returnStatus: true,
-                                script: 'dart format --output=none --set-exit-if-changed .'
-                            )
-                            if (status != 0) {
-                                echo 'AVISO: hay archivos sin formatear. Ejecuta "dart format ." para corregirlo. No bloquea el build.'
-                            } else {
-                                echo 'Formato correcto.'
-                            }
-                        }
+        stage('Formato (aviso)') {
+            steps {
+                script {
+                    def status = bat(
+                        returnStatus: true,
+                        script: 'dart format --output=none --set-exit-if-changed .'
+                    )
+                    if (status != 0) {
+                        echo 'AVISO: hay archivos sin formatear. Ejecuta "dart format ." para corregirlo. No bloquea el build.'
+                    } else {
+                        echo 'Formato correcto.'
                     }
                 }
             }
@@ -119,22 +118,18 @@ pipeline {
             }
         }
 
-        stage('Compilacion') {
-            parallel {
-                stage('APK Android') {
-                    steps {
-                        bat "flutter build apk --${params.ANDROID_BUILD_MODE}"
-                    }
-                }
+        stage('APK Android') {
+            steps {
+                bat "flutter build apk --${params.ANDROID_BUILD_MODE}"
+            }
+        }
 
-                stage('Web') {
-                    when { expression { return params.BUILD_WEB } }
-                    steps {
-                        bat 'flutter build web --release'
-                        // Compress-Archive evita depender del plugin pipeline-utility-steps
-                        bat 'powershell -NoProfile -Command "Compress-Archive -Path build/web/* -DestinationPath build/adopet-web.zip -Force"'
-                    }
-                }
+        stage('Web') {
+            when { expression { return params.BUILD_WEB } }
+            steps {
+                bat 'flutter build web --release'
+                // Compress-Archive evita depender del plugin pipeline-utility-steps
+                bat 'powershell -NoProfile -Command "Compress-Archive -Path build/web/* -DestinationPath build/adopet-web.zip -Force"'
             }
         }
     }
